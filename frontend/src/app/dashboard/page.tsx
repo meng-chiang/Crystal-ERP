@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { dashboardApi, photosApi } from '@/lib/api';
-import { formatCurrency, formatDate, CHANNEL_LABELS } from '@/lib/utils';
+import { formatCurrency, formatDate, calculateProfit, CHANNEL_LABELS } from '@/lib/utils';
 import { TrendingUp, Package, DollarSign, BarChart3 } from 'lucide-react';
 
 function StatCard({
@@ -125,9 +125,7 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3">
               {stats.recentSales.map((sale) => {
-                const profit =
-                  parseFloat(String(sale.salePrice)) -
-                  parseFloat(String(sale.product?.costPrice ?? '0'));
+                const profit = calculateProfit(sale.salePrice, sale.product?.costPrice);
                 return (
                   <div key={sale.id} className="flex items-start justify-between text-sm">
                     <div>

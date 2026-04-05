@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { salesApi } from '@/lib/api';
-import { formatCurrency, formatDate, CHANNEL_LABELS, cn } from '@/lib/utils';
+import { formatCurrency, formatDate, calculateProfit, CHANNEL_LABELS, cn } from '@/lib/utils';
 import { Plus, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import Pagination from '@/components/ui/Pagination';
@@ -72,9 +72,7 @@ export default function SalesPage() {
               </thead>
               <tbody>
                 {data?.data.map((sale) => {
-                  const profit =
-                    parseFloat(String(sale.salePrice)) -
-                    parseFloat(String(sale.product?.costPrice ?? '0'));
+                  const profit = calculateProfit(sale.salePrice, sale.product?.costPrice);
                   return (
                     <tr key={sale.id} className="border-b border-gray-50 hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-600">{formatDate(String(sale.soldAt))}</td>

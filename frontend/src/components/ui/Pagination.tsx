@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -11,12 +12,12 @@ export default function Pagination({ page, totalPages, onPageChange }: Paginatio
   if (totalPages <= 1) return null;
 
   // Show at most 7 page buttons with ellipsis
-  const getPages = () => {
+  const pages = useMemo(() => {
     if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
     if (page <= 4) return [1, 2, 3, 4, 5, '...', totalPages];
     if (page >= totalPages - 3) return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
     return [1, '...', page - 1, page, page + 1, '...', totalPages];
-  };
+  }, [page, totalPages]);
 
   return (
     <div className="flex items-center justify-center gap-1">
@@ -28,7 +29,7 @@ export default function Pagination({ page, totalPages, onPageChange }: Paginatio
         <ChevronLeft className="w-4 h-4" />
       </button>
 
-      {getPages().map((p, i) =>
+      {pages.map((p, i) =>
         p === '...' ? (
           <span key={`ellipsis-${i}`} className="w-8 text-center text-gray-400 text-sm">…</span>
         ) : (

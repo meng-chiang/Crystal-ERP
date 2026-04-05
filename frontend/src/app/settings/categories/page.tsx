@@ -13,8 +13,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function CategoriesPage() {
   const queryClient = useQueryClient();
-  const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [deleteName, setDeleteName] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['categories'],
@@ -45,7 +44,7 @@ export default function CategoriesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       toast.success('分類已刪除');
-      setDeleteId(null);
+      setDeleteTarget(null);
     },
     onError: () => toast.error('刪除失敗，請重試'),
   });
@@ -119,7 +118,7 @@ export default function CategoriesPage() {
                   </span>
                 </div>
                 <button
-                  onClick={() => { setDeleteId(cat.id); setDeleteName(cat.name); }}
+                  onClick={() => setDeleteTarget({ id: cat.id, name: cat.name })}
                   className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -131,12 +130,12 @@ export default function CategoriesPage() {
       </div>
 
       <ConfirmDialog
-        open={deleteId !== null}
-        onOpenChange={(open) => { if (!open) setDeleteId(null); }}
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
         title="確認刪除分類"
-        description={`確定要刪除分類「${deleteName}」嗎？已使用此分類的商品不會被刪除，但分類欄位將變為空白。`}
+        description={`確定要刪除分類「${deleteTarget?.name}」嗎？已使用此分類的商品不會被刪除，但分類欄位將變為空白。`}
         confirmLabel="確認刪除"
-        onConfirm={() => deleteId !== null && deleteMutation.mutate(deleteId)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
         destructive
       />
     </div>

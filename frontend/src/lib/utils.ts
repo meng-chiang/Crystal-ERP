@@ -37,6 +37,10 @@ export const STATUS_LABELS: Record<string, string> = {
   sold: '已售出',
 };
 
+export function calculateProfit(salePrice: string | number, costPrice?: string | number | null): number {
+  return parseFloat(String(salePrice)) - parseFloat(String(costPrice ?? '0'));
+}
+
 export const STATUS_COLORS: Record<string, string> = {
   in_stock: 'bg-green-100 text-green-800',
   reserved: 'bg-yellow-100 text-yellow-800',

@@ -14,6 +14,16 @@ import type {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
+function buildSearchParams(params?: Record<string, string | number | undefined>): URLSearchParams {
+  const searchParams = new URLSearchParams();
+  if (params) {
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== '') searchParams.set(k, String(v));
+    });
+  }
+  return searchParams;
+}
+
 const client = ky.create({
   prefixUrl: `${API_BASE}/api/v1`,
   timeout: 30000,
@@ -21,15 +31,8 @@ const client = ky.create({
 
 // 商品 API
 export const productsApi = {
-  list: (params?: Record<string, string | number | undefined>) => {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== '') searchParams.set(k, String(v));
-      });
-    }
-    return client.get('products', { searchParams }).json<PaginatedResponse<Product & { primaryPhoto: { filename: string } | null }>>();
-  },
+  list: (params?: Record<string, string | number | undefined>) =>
+    client.get('products', { searchParams: buildSearchParams(params) }).json<PaginatedResponse<Product & { primaryPhoto: { filename: string } | null }>>(),
 
   get: (id: number) =>
     client.get(`products/${id}`).json<ApiResponse<Product & { photos: { id: number; filename: string; isPrimary: boolean; sortOrder: number }[] }>>(),
@@ -73,15 +76,8 @@ export const categoriesApi = {
 
 // 銷售 API
 export const salesApi = {
-  list: (params?: Record<string, string | number | undefined>) => {
-    const searchParams = new URLSearchParams();
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== '') searchParams.set(k, String(v));
-      });
-    }
-    return client.get('sales', { searchParams }).json<PaginatedResponse<Sale>>();
-  },
+  list: (params?: Record<string, string | number | undefined>) =>
+    client.get('sales', { searchParams: buildSearchParams(params) }).json<PaginatedResponse<Sale>>(),
 
   get: (id: number) => client.get(`sales/${id}`).json<ApiResponse<Sale>>(),
 

@@ -26,7 +26,7 @@ app.get('/stats', async (c) => {
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .where(eq(products.status, 'in_stock'))
-    .groupBy(categories.name);
+    .groupBy(categories.id, categories.name);
 
   // 已實現收入與毛利
   const revenueStats = await db

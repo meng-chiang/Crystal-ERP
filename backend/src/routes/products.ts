@@ -96,7 +96,7 @@ app.get('/:id', async (c) => {
     .select()
     .from(productPhotos)
     .where(eq(productPhotos.productId, id))
-    .orderBy(productPhotos.sortOrder, productPhotos.createdAt);
+    .orderBy(productPhotos.sortOrder, productPhotos.id);
 
   return c.json({
     data: {

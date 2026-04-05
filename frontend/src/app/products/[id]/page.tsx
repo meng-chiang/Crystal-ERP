@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { productsApi, photosApi } from '@/lib/api';
-import { formatCurrency, STATUS_LABELS, STATUS_COLORS, cn } from '@/lib/utils';
+import { formatCurrency, calculateProfit, STATUS_LABELS, STATUS_COLORS, cn } from '@/lib/utils';
 import { ArrowLeft, Edit, ShoppingCart, QrCode, Trash2, Download } from 'lucide-react';
 import Link from 'next/link';
 import PhotoUploader from '@/components/products/PhotoUploader';
@@ -41,7 +41,7 @@ export default function ProductDetailPage() {
   if (!product) return <div className="text-red-500">商品不存在</div>;
 
   const primaryPhoto = product.photos.find((p) => p.isPrimary) ?? product.photos[0];
-  const profit = parseFloat(product.listPrice) - parseFloat(product.costPrice);
+  const profit = calculateProfit(product.listPrice, product.costPrice);
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -125,30 +125,17 @@ export default function ProductDetailPage() {
 
         {(product.weightG || product.lengthMm) && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            {product.weightG && (
-              <div>
-                <p className="text-xs text-gray-400">重量</p>
-                <p className="text-sm font-medium text-gray-900">{product.weightG}g</p>
+            {([
+              { label: '重量', value: product.weightG, unit: 'g' },
+              { label: '長度', value: product.lengthMm, unit: 'mm' },
+              { label: '寬度', value: product.widthMm, unit: 'mm' },
+              { label: '高度', value: product.heightMm, unit: 'mm' },
+            ] as const).filter((d) => d.value).map((d) => (
+              <div key={d.label}>
+                <p className="text-xs text-gray-400">{d.label}</p>
+                <p className="text-sm font-medium text-gray-900">{d.value}{d.unit}</p>
               </div>
-            )}
-            {product.lengthMm && (
-              <div>
-                <p className="text-xs text-gray-400">長度</p>
-                <p className="text-sm font-medium text-gray-900">{product.lengthMm}mm</p>
-              </div>
-            )}
-            {product.widthMm && (
-              <div>
-                <p className="text-xs text-gray-400">寬度</p>
-                <p className="text-sm font-medium text-gray-900">{product.widthMm}mm</p>
-              </div>
-            )}
-            {product.heightMm && (
-              <div>
-                <p className="text-xs text-gray-400">高度</p>
-                <p className="text-sm font-medium text-gray-900">{product.heightMm}mm</p>
-              </div>
-            )}
+            ))}
           </div>
         )}
 

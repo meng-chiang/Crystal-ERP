@@ -27,7 +27,9 @@ const DEFAULT_FILTERS: ProductFilterValues = {
 };
 
 export function isFilterActive(filters: ProductFilterValues): boolean {
-  return JSON.stringify(filters) !== JSON.stringify(DEFAULT_FILTERS);
+  return filters.q !== '' || filters.status !== '' || filters.categoryId !== '' ||
+    filters.weightMin !== '' || filters.weightMax !== '' ||
+    filters.priceMin !== '' || filters.priceMax !== '';
 }
 
 interface ProductFiltersProps {
@@ -46,6 +48,7 @@ export default function ProductFilters({ filters, onChange }: ProductFiltersProp
   const { data: categoriesData } = useQuery({
     queryKey: ['categories'],
     queryFn: () => categoriesApi.list(),
+    staleTime: 60 * 60 * 1000, // categories rarely change
   });
 
   const set = (partial: Partial<ProductFilterValues>) =>

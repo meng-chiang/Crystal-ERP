@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { productsApi, photosApi } from '@/lib/api';
 import { cn, formatCurrency, STATUS_LABELS, STATUS_COLORS } from '@/lib/utils';
@@ -35,12 +35,12 @@ export default function ProductsPage() {
       }),
   });
 
-  const activeFilterCount = [
+  const activeFilterCount = useMemo(() => [
     filters.status,
     filters.categoryId,
     filters.weightMin || filters.weightMax,
     filters.priceMin || filters.priceMax,
-  ].filter(Boolean).length;
+  ].filter(Boolean).length, [filters]);
 
   return (
     <div className="space-y-5">
