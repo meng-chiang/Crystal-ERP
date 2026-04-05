@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, Suspense } from 'react';
+import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -51,12 +52,14 @@ function NewSaleForm() {
 
   const createMutation = useMutation({
     mutationFn: (data: CreateSaleInput) => salesApi.create(data),
-    onSuccess: () => {
+    onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast.success('銷售已記錄');
       router.push('/sales');
     },
+    onError: () => toast.error('記錄失敗，請重試'),
   });
 
   const selectProduct = (id: number) => {

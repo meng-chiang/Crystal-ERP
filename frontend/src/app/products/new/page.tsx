@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { productsApi, photosApi } from '@/lib/api';
 import ProductForm from '@/components/products/ProductForm';
 import PhotoUploader from '@/components/products/PhotoUploader';
@@ -21,7 +22,9 @@ export default function NewProductPage() {
     onSuccess: (res) => {
       setCreatedProductId(res.data.id);
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success(`商品已建立：${res.data.sku}`);
     },
+    onError: () => toast.error('建立失敗，請重試'),
   });
 
   const handleSubmit = async (data: CreateProductInput) => {

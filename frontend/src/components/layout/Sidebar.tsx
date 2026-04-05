@@ -3,12 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Package, ShoppingCart, Gem } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Gem, Tag } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: '看板', icon: LayoutDashboard },
   { href: '/products', label: '商品庫存', icon: Package },
   { href: '/sales', label: '銷售紀錄', icon: ShoppingCart },
+  { href: '/settings/categories', label: '分類管理', icon: Tag },
 ];
 
 export default function Sidebar() {

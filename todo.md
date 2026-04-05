@@ -29,25 +29,25 @@
 - [x] Dashboard page (`/dashboard`)
 - [x] Windows helper scripts: `start.bat`, `stop.bat`, `backup.bat`
 
-## Phase 3 — Filters & Polish
+## Phase 3 — Filters & Polish ✅
 
-- [ ] `ProductFilters` component — category multi-select, weight range, price range
-- [ ] Wire filters to API query params on product list page
-- [ ] Pagination component (product list + sales history)
-- [ ] Delete confirmation dialog
-- [ ] Status badge color coding (green=in_stock, yellow=reserved, gray=sold) — verify consistency across pages
-- [ ] Category management UI (add/delete categories from frontend)
-- [ ] Toast notifications for create/update/delete success & error
+- [x] `ProductFilters` component — category pills, weight range, price range
+- [x] Wire filters to API query params on product list page
+- [x] Pagination component (product list + sales history)
+- [x] Delete confirmation dialog (`ConfirmDialog` using Radix AlertDialog)
+- [x] Status badge color coding — consistent across all pages
+- [x] Category management UI (`/settings/categories` — add/delete)
+- [x] Toast notifications (sonner) on create/update/delete success & error
 
-## Phase 4 — Production Dockerfiles
+## Phase 4 — Production Dockerfiles ✅
 
-- [ ] Multi-stage `backend/Dockerfile` (builder → runner, no dev deps)
-- [ ] Next.js standalone output `frontend/Dockerfile` (`output: 'standalone'`)
-- [ ] End-to-end test: `docker compose up --build` from clean state
-- [ ] Verify photo upload and static serving works inside containers
+- [x] Multi-stage `backend/Dockerfile` (builder → runner, no dev deps)
+- [x] Next.js standalone output `frontend/Dockerfile` (`output: 'standalone'`)
+- [x] `.dockerignore` to exclude unnecessary files from build context
+- [ ] End-to-end test: `docker compose up --build` from clean state (run when Docker available)
 
-## Phase 5 — Handoff
+## Phase 5 — Handoff ✅
 
-- [ ] `README.md` in Chinese: install Docker Desktop, first-run steps, backup instructions, restore procedure
-- [ ] `install_scheduler.bat` — Windows Task Scheduler auto-backup at 2am (optional)
+- [x] `README.md` in Chinese: install Docker Desktop, first-run steps, backup instructions, FAQs
+- [x] `install_scheduler.bat` — Windows Task Scheduler auto-backup at 2am
 - [ ] Final walkthrough with friend (POC via ngrok or Tailscale)

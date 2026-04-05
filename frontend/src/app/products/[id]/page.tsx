@@ -2,17 +2,21 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { productsApi, photosApi, salesApi } from '@/lib/api';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { productsApi, photosApi } from '@/lib/api';
 import { formatCurrency, STATUS_LABELS, STATUS_COLORS, cn } from '@/lib/utils';
 import { ArrowLeft, Edit, ShoppingCart, QrCode, Trash2, Download } from 'lucide-react';
 import Link from 'next/link';
 import PhotoUploader from '@/components/products/PhotoUploader';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
 export default function ProductDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
   const productId = parseInt(id as string);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['product', productId],
@@ -23,15 +27,11 @@ export default function ProductDetailPage() {
     mutationFn: () => productsApi.delete(productId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('商品已刪除');
       router.push('/products');
     },
+    onError: () => toast.error('刪除失敗，請重試'),
   });
-
-  const handleDelete = () => {
-    if (confirm('確定要刪除此商品嗎？此操作無法還原。')) {
-      deleteMutation.mutate();
-    }
-  };
 
   if (isLoading) {
     return <div className="animate-pulse bg-white rounded-xl h-96" />;
@@ -98,14 +98,12 @@ export default function ProductDetailPage() {
 
       {/* 規格資訊 */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-gray-400 font-mono">{product.sku}</p>
-            <h2 className="text-lg font-bold text-gray-900 mt-0.5">{product.name}</h2>
-            {product.category && (
-              <p className="text-sm text-purple-600 mt-0.5">{product.category.name}</p>
-            )}
-          </div>
+        <div>
+          <p className="text-xs text-gray-400 font-mono">{product.sku}</p>
+          <h2 className="text-lg font-bold text-gray-900 mt-0.5">{product.name}</h2>
+          {product.category && (
+            <p className="text-sm text-purple-600 mt-0.5">{product.category.name}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -185,11 +183,7 @@ export default function ProductDetailPage() {
             下載
           </a>
         </div>
-        <img
-          src={productsApi.qrUrl(product.id)}
-          alt="QR Code"
-          className="w-32 h-32 mx-auto"
-        />
+        <img src={productsApi.qrUrl(product.id)} alt="QR Code" className="w-32 h-32 mx-auto" />
         <p className="text-xs text-gray-400 text-center mt-2">掃描查看此商品詳情</p>
       </div>
 
@@ -205,7 +199,7 @@ export default function ProductDetailPage() {
           <h2 className="font-semibold text-red-700 mb-2">刪除商品</h2>
           <p className="text-sm text-gray-500 mb-3">此操作無法還原，請確認再執行。</p>
           <button
-            onClick={handleDelete}
+            onClick={() => setConfirmOpen(true)}
             disabled={deleteMutation.isPending}
             className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
           >
@@ -214,6 +208,16 @@ export default function ProductDetailPage() {
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="確認刪除商品"
+        description={`確定要刪除「${product.name}」嗎？此操作無法還原。`}
+        confirmLabel="確認刪除"
+        onConfirm={() => deleteMutation.mutate()}
+        destructive
+      />
     </div>
   );
 }

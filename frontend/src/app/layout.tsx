@@ -3,6 +3,7 @@
 import './globals.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Toaster } from 'sonner';
 import Sidebar from '@/components/layout/Sidebar';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Sidebar />
             <main className="flex-1 overflow-auto p-6">{children}</main>
           </div>
+          <Toaster position="bottom-right" richColors />
         </QueryClientProvider>
       </body>
     </html>

@@ -2,39 +2,32 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# 複製 workspace 設定
-COPY package.json ./
+# Copy workspace manifests first (layer cache)
+COPY package.json package-lock.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY backend/package.json ./backend/
 
-# 安裝所有依賴
-RUN npm install --workspace=packages/shared --workspace=backend
+RUN npm ci --workspace=packages/shared --workspace=backend
 
-# 複製原始碼
+# Copy source
 COPY packages/shared ./packages/shared
 COPY backend ./backend
 
-# 編譯 shared
+# Build shared then backend
 RUN npm run build --workspace=packages/shared
-
-# 編譯 backend
 RUN npm run build --workspace=backend
 
-# --- 執行階段 ---
+# --- Production runner ---
 FROM node:20-alpine AS runner
-
-WORKDIR /app
-
-COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
-COPY --from=builder /app/packages/shared/package.json ./packages/shared/
-COPY --from=builder /app/backend/dist ./backend/dist
-COPY --from=builder /app/backend/node_modules ./backend/node_modules
-COPY --from=builder /app/backend/package.json ./backend/
-COPY package.json ./
 
 WORKDIR /app/backend
 
 ENV NODE_ENV=production
+
+# Only copy what's needed to run
+COPY --from=builder /app/backend/dist ./dist
+COPY --from=builder /app/backend/node_modules ./node_modules
+COPY --from=builder /app/backend/package.json ./
 
 EXPOSE 3001
 

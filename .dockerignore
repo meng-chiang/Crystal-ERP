@@ -1,0 +1,14 @@
+node_modules
+.git
+.env
+.env.*
+!.env.example
+storage/photos/*
+backups/
+*.bat
+docker-compose*.yml
+plan.md
+todo.md
+**/.next
+**/dist
+**/*.tsbuildinfo

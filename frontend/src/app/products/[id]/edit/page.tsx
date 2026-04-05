@@ -2,6 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { productsApi } from '@/lib/api';
 import ProductForm from '@/components/products/ProductForm';
 import type { CreateProductInput } from '@crystal-erp/shared';
@@ -24,8 +25,10 @@ export default function EditProductPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['product', productId] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      toast.success('商品已更新');
       router.push(`/products/${productId}`);
     },
+    onError: () => toast.error('更新失敗，請重試'),
   });
 
   if (isLoading) return <div className="animate-pulse bg-white rounded-xl h-96" />;
