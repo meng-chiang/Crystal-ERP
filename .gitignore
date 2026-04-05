@@ -1,0 +1,7 @@
+node_modules/
+.env
+dist/
+.next/
+backups/
+storage/photos/*
+!storage/photos/.gitkeep
