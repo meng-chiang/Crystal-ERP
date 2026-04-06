@@ -47,15 +47,13 @@ test.describe('商品庫存', () => {
     await expect(page.getByText('E2E 紫水晶柱').first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('篩選功能展開', async ({ page }) => {
+  test('篩選列常駐顯示', async ({ page }) => {
     await page.goto('/products');
 
-    await page.getByRole('button', { name: '篩選' }).click();
-
-    // '篩選條件' is the sidebar header, always visible when open
-    await expect(page.getByText('篩選條件')).toBeVisible();
-    // '狀態' is the section label inside ProductFilters
-    await expect(page.getByText('狀態', { exact: true })).toBeVisible();
+    await expect(page.getByPlaceholder('搜尋商品名稱...')).toBeVisible();
+    await expect(page.getByRole('option', { name: '全部分類' })).toBeAttached();
+    await expect(page.getByRole('option', { name: '全部狀態' })).toBeAttached();
+    await expect(page.getByPlaceholder('最小')).toBeVisible();
   });
 
   test('商品詳情頁', async ({ page }) => {
