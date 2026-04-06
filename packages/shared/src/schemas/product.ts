@@ -8,13 +8,18 @@ export const CreateCategorySchema = z.object({
   nameEn: z.string().min(1, '請輸入英文代碼（用於 SKU）').max(10).regex(/^[A-Z]+$/, '請使用大寫英文字母'),
 });
 
+const optionalDecimal = z.preprocess(
+  (v) => (v === '' ? undefined : v),
+  z.string().regex(/^\d+(\.\d{1,2})?$/, '請輸入有效數字').nullable().optional()
+);
+
 export const CreateProductSchema = z.object({
   name: z.string().min(1, '請輸入商品名稱').max(200),
   categoryId: z.number().int().positive().nullable().optional(),
-  lengthMm: z.string().regex(/^\d+(\.\d{1,2})?$/, '請輸入有效數字').nullable().optional(),
-  widthMm: z.string().regex(/^\d+(\.\d{1,2})?$/, '請輸入有效數字').nullable().optional(),
-  heightMm: z.string().regex(/^\d+(\.\d{1,2})?$/, '請輸入有效數字').nullable().optional(),
-  weightG: z.string().regex(/^\d+(\.\d{1,2})?$/, '請輸入有效數字').nullable().optional(),
+  lengthMm: optionalDecimal,
+  widthMm: optionalDecimal,
+  heightMm: optionalDecimal,
+  weightG: optionalDecimal,
   costPrice: z.string().regex(/^\d+(\.\d{1,2})?$/, '請輸入有效進貨價'),
   listPrice: z.string().regex(/^\d+(\.\d{1,2})?$/, '請輸入有效標售價'),
   qualityDescription: z.string().max(5000).nullable().optional(),

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { createTestCategory, cleanupProduct, cleanupCategory } from './helpers';
+import { createTestCategory, cleanupCategory } from './helpers';
 
 test.describe('商品庫存', () => {
   let categoryId: number;
@@ -20,57 +20,52 @@ test.describe('商品庫存', () => {
 
   test('新增商品完整流程', async ({ page }) => {
     await page.goto('/products/new');
+    await expect(page.getByRole('heading', { name: '新增水晶商品' })).toBeVisible();
 
-    await expect(page.getByRole('heading', { name: '新增商品' })).toBeVisible();
+    // Use name attributes set by react-hook-form register() — unambiguous
+    await page.locator('input[name="name"]').fill('E2E 紫水晶柱');
+    await page.locator('input[name="weightG"]').fill('200');
+    await page.locator('input[name="costPrice"]').fill('800');
+    await page.locator('input[name="listPrice"]').fill('1500');
+    await page.locator('textarea[name="qualityDescription"]').fill('冰裂少，光澤均勻');
+    await page.locator('select[name="categoryId"]').selectOption({ label: '測試分類' });
 
-    // 填寫表單
-    await page.getByLabel('商品名稱').fill('E2E 紫水晶柱');
-    await page.getByLabel('進貨價（成本）').fill('800');
-    await page.getByLabel('標售價').fill('1500');
-    await page.getByLabel('重量 (g)').fill('200');
-    await page.getByLabel('品相描述').fill('冰裂少，光澤均勻');
-
-    // 選分類（下拉）
-    await page.getByLabel('分類').selectOption({ label: '測試分類' });
-
-    // 送出
     await page.getByRole('button', { name: '儲存商品' }).click();
 
-    // 應跳轉到詳情頁或商品列表
-    await page.waitForURL(/\/products\/\d+/, { timeout: 8000 });
+    // After save, the form shows a photo-upload step with a "完成" button
+    await expect(page.getByRole('button', { name: '完成，前往商品頁' })).toBeVisible({ timeout: 8000 });
+    await page.getByRole('button', { name: '完成，前往商品頁' }).click();
 
-    // 詳情頁顯示商品名稱
-    await expect(page.getByText('E2E 紫水晶柱')).toBeVisible();
+    await page.waitForURL(/\/products\/\d+/, { timeout: 8000 });
+    await expect(page.locator('h1').filter({ hasText: 'E2E 紫水晶柱' })).toBeVisible();
   });
 
   test('搜尋商品', async ({ page }) => {
     await page.goto('/products');
 
-    const search = page.getByPlaceholder('搜尋商品名稱...');
-    await search.fill('E2E');
-
-    // 至少出現我們剛建立的商品
-    await expect(page.getByText('E2E 紫水晶柱')).toBeVisible({ timeout: 5000 });
+    await page.getByPlaceholder('搜尋商品名稱...').fill('E2E');
+    await expect(page.getByText('E2E 紫水晶柱').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('篩選功能展開', async ({ page }) => {
     await page.goto('/products');
 
     await page.getByRole('button', { name: '篩選' }).click();
-    await expect(page.getByText('狀態')).toBeVisible();
-    await expect(page.getByText('分類')).toBeVisible();
+
+    // '篩選條件' is the sidebar header, always visible when open
+    await expect(page.getByText('篩選條件')).toBeVisible();
+    // '狀態' is the section label inside ProductFilters
+    await expect(page.getByText('狀態', { exact: true })).toBeVisible();
   });
 
   test('商品詳情頁', async ({ page }) => {
     await page.goto('/products');
 
-    // 點第一筆商品卡片
-    const card = page.locator('a[href^="/products/"]').first();
+    // Exclude /products/new (the "新增水晶" header button) from the match
+    const card = page.locator('a[href^="/products/"]:not([href="/products/new"])').first();
     await card.click();
 
     await expect(page).toHaveURL(/\/products\/\d+/);
-
-    // 必要資訊存在
     await expect(page.getByText('進貨價（成本）')).toBeVisible();
     await expect(page.getByText('標售價')).toBeVisible();
     await expect(page.getByText('QR Code')).toBeVisible();
@@ -79,7 +74,7 @@ test.describe('商品庫存', () => {
 
   test('商品詳情 — 有編輯按鈕', async ({ page }) => {
     await page.goto('/products');
-    const card = page.locator('a[href^="/products/"]').first();
+    const card = page.locator('a[href^="/products/"]:not([href="/products/new"])').first();
     const href = await card.getAttribute('href');
     await page.goto(href!);
 
@@ -87,7 +82,6 @@ test.describe('商品庫存', () => {
   });
 
   test('刪除 in_stock 商品', async ({ page }) => {
-    // 建立一筆專門用來刪的商品
     const res = await fetch('http://localhost:3001/api/v1/products', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

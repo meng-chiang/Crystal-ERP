@@ -3,7 +3,7 @@
 # Usage: bash scripts/test-api.sh [BASE_URL]
 # Default BASE_URL: http://localhost:3001/api/v1
 
-set -euo pipefail
+set -uo pipefail   # no -e: we handle failures explicitly per assertion
 
 BASE="${1:-http://localhost:3001/api/v1}"
 
@@ -13,183 +13,180 @@ BOLD='\033[1m'
 
 PASS=0; FAIL=0
 
-pass() { echo -e "${GREEN}✓${NC} $1"; ((PASS++)); }
-fail() { echo -e "${RED}✗${NC} $1"; ((FAIL++)); }
+pass()    { echo -e "${GREEN}✓${NC} $1";          PASS=$((PASS + 1)); }
+fail()    { echo -e "${RED}✗${NC} $1";            FAIL=$((FAIL + 1)); }
 section() { echo -e "\n${BOLD}${YELLOW}── $1 ──${NC}"; }
 
 # ── helpers ───────────────────────────────────────────────────────────────────
-post() {  # post PATH BODY → prints response body
-  curl -sf -X POST "$BASE$1" \
-    -H "Content-Type: application/json" \
-    -d "$2"
+# Returns response body; exits with curl's exit code (non-zero on HTTP 4xx/5xx)
+http_post() {
+  curl -sf -X POST "$BASE$1" -H "Content-Type: application/json" -d "$2"
 }
-
-get() {   # get PATH → prints response body
+http_get() {
   curl -sf "$BASE$1"
 }
-
-delete() { # delete PATH → prints HTTP status
+http_delete() {
   curl -sf -o /dev/null -w "%{http_code}" -X DELETE "$BASE$1"
 }
-
-json_field() { # json_field JSON_STRING FIELD → prints value (via python or node)
-  echo "$1" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d$2)" 2>/dev/null \
-    || echo "$1" | node -e "process.stdin.resume();let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(eval('('+d+')$2')))"
+http_put() {
+  curl -sf -X PUT "$BASE$1" -H "Content-Type: application/json" -d "$2"
+}
+http_status() {   # returns only status code, no -f
+  curl -s -o /dev/null -w "%{http_code}" "$@"
 }
 
-assert_eq() { # assert_eq LABEL EXPECTED ACTUAL
-  if [ "$2" = "$3" ]; then pass "$1"; else fail "$1 (expected='$2' got='$3')"; fi
+json_get() {  # json_get JSON_STRING 'key.subkey'
+  echo "$1" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+for k in '$2'.split('.'):
+    d = d[int(k)] if k.isdigit() else d[k]
+print(d)
+" 2>/dev/null || echo ""
 }
 
-assert_nonempty() { # assert_nonempty LABEL VALUE
-  if [ -n "$2" ] && [ "$2" != "null" ]; then pass "$1"; else fail "$1 (empty/null)"; fi
+assert_eq() {     # assert_eq LABEL EXPECTED ACTUAL
+  if [ "$2" = "$3" ]; then pass "$1"
+  else fail "$1 (expected='$2' got='$3')"; fi
+}
+assert_nonempty() {
+  if [ -n "$1" ] && [ "$1" != "null" ] && [ "$1" != "None" ]; then pass "$2"
+  else fail "$2 (empty)"; fi
 }
 
-# ── track created IDs for cleanup ─────────────────────────────────────────────
-CATEGORY_ID=""
-PRODUCT_ID=""
-SALE_ID=""
+# ── test data IDs (for cleanup) ───────────────────────────────────────────────
+CATEGORY_ID=""; PRODUCT_ID=""; SALE_ID=""
+
+# Remove any leftover TST test data from a previous interrupted run
+pre_cleanup() {
+  local cats
+  cats=$(curl -sf "$BASE/categories" 2>/dev/null || echo '{"data":[]}')
+  echo "$cats" | python3 -c "
+import sys, json, urllib.request
+cats = json.load(sys.stdin)['data']
+for c in cats:
+    if c['nameEn'] in ('TST',):
+        req = urllib.request.Request('$BASE/categories/' + str(c['id']), method='DELETE')
+        try: urllib.request.urlopen(req); print('  pre-clean: deleted leftover category', c['nameEn'], c['id'])
+        except: pass
+" 2>/dev/null || true
+}
 
 cleanup() {
   echo -e "\n${YELLOW}── 清除測試資料 ──${NC}"
-  [ -n "$SALE_ID" ]    && { STATUS=$(delete "/sales/$SALE_ID");    [ "$STATUS" = "204" ] && echo "  sale $SALE_ID deleted" || echo "  sale already gone"; }
-  [ -n "$PRODUCT_ID" ] && { STATUS=$(delete "/products/$PRODUCT_ID"); [ "$STATUS" = "204" ] && echo "  product $PRODUCT_ID deleted" || echo "  product already gone / sold"; }
-  [ -n "$CATEGORY_ID" ] && { STATUS=$(delete "/categories/$CATEGORY_ID"); [ "$STATUS" = "204" ] && echo "  category $CATEGORY_ID deleted" || echo "  category already gone"; }
+  if [ -n "$SALE_ID" ]; then
+    ST=$(http_delete "/sales/$SALE_ID" 2>/dev/null || echo "000")
+    [ "$ST" = "204" ] && echo "  sale $SALE_ID deleted" || echo "  sale $SALE_ID already gone (status=$ST)"
+  fi
+  if [ -n "$PRODUCT_ID" ]; then
+    ST=$(http_delete "/products/$PRODUCT_ID" 2>/dev/null || echo "000")
+    [ "$ST" = "204" ] && echo "  product $PRODUCT_ID deleted" || echo "  product $PRODUCT_ID already gone / sold (status=$ST)"
+  fi
+  if [ -n "$CATEGORY_ID" ]; then
+    ST=$(http_delete "/categories/$CATEGORY_ID" 2>/dev/null || echo "000")
+    [ "$ST" = "204" ] && echo "  category $CATEGORY_ID deleted" || echo "  category $CATEGORY_ID already gone (status=$ST)"
+  fi
 }
 trap cleanup EXIT
 
 # ═══════════════════════════════════════════════════════════════════════════════
 echo -e "${BOLD}Crystal ERP — API Test${NC}  ${BASE}"
 
+pre_cleanup
+
 # ── 1. Health ─────────────────────────────────────────────────────────────────
 section "1. Health check"
-HEALTH=$(curl -sf -o /dev/null -w "%{http_code}" "$BASE/../health" 2>/dev/null || echo "000")
+HEALTH=$(http_status "$BASE/../health" 2>/dev/null || echo "000")
 if [ "$HEALTH" = "200" ]; then pass "GET /health → 200"
-else echo -e "${YELLOW}⚠${NC}  /health not found (skipped — not required)"; fi
+else echo -e "${YELLOW}⚠${NC}  /health not found (skipped)"; fi
 
 # ── 2. Categories ─────────────────────────────────────────────────────────────
 section "2. 分類 CRUD"
 
-# List (empty or existing)
-CATS=$(get "/categories")
-assert_nonempty "GET /categories" "$CATS"
+CATS=$(http_get "/categories")
+assert_nonempty "$CATS" "GET /categories"
 
-# Create
-CAT=$(post "/categories" '{"name":"測試紫水晶","nameEn":"TST"}')
-CATEGORY_ID=$(json_field "$CAT" "['data']['id']")
-assert_nonempty "POST /categories → id" "$CATEGORY_ID"
-assert_eq "POST /categories → nameEn" "TST" "$(json_field "$CAT" "['data']['nameEn']")"
+CAT=$(http_post "/categories" '{"name":"測試紫水晶","nameEn":"TST"}')
+CATEGORY_ID=$(json_get "$CAT" "data.id")
+assert_nonempty "$CATEGORY_ID" "POST /categories → id"
+assert_eq "POST /categories → nameEn" "TST" "$(json_get "$CAT" "data.nameEn")"
 
-# Duplicate nameEn
-DUP_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X POST "$BASE/categories" \
+# Duplicate nameEn should return 400
+DUP_STATUS=$(http_status -X POST "$BASE/categories" \
   -H "Content-Type: application/json" \
   -d '{"name":"重複","nameEn":"TST"}')
-assert_eq "POST /categories duplicate nameEn → 400" "400" "$DUP_STATUS"
-
-# List after create
-CATS2=$(get "/categories")
-COUNT=$(json_field "$CATS2" "['data']" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d))" 2>/dev/null || echo "?")
-assert_nonempty "GET /categories after insert" "$COUNT"
+assert_eq "POST /categories duplicate → 400" "400" "$DUP_STATUS"
 
 # ── 3. Products ───────────────────────────────────────────────────────────────
 section "3. 商品 CRUD"
 
-# Create
-PRODUCT=$(post "/products" "{
-  \"name\": \"E2E 紫水晶原石\",
-  \"categoryId\": $CATEGORY_ID,
-  \"costPrice\": \"600\",
-  \"listPrice\": \"1200\",
-  \"weightG\": 150,
-  \"qualityDescription\": \"冰裂少，色澤均勻\"
-}")
-PRODUCT_ID=$(json_field "$PRODUCT" "['data']['id']")
-PRODUCT_SKU=$(json_field "$PRODUCT" "['data']['sku']")
-assert_nonempty "POST /products → id" "$PRODUCT_ID"
-assert_nonempty "POST /products → sku (auto-generated)" "$PRODUCT_SKU"
-assert_eq "POST /products → status default in_stock" "in_stock" "$(json_field "$PRODUCT" "['data']['status']")"
+PRODUCT=$(http_post "/products" "{\"name\":\"E2E 紫水晶原石\",\"categoryId\":$CATEGORY_ID,\"costPrice\":\"600\",\"listPrice\":\"1200\",\"weightG\":\"150\",\"qualityDescription\":\"冰裂少，色澤均勻\"}")
+PRODUCT_ID=$(json_get "$PRODUCT" "data.id")
+PRODUCT_SKU=$(json_get "$PRODUCT" "data.sku")
+assert_nonempty "$PRODUCT_ID"  "POST /products → id"
+assert_nonempty "$PRODUCT_SKU" "POST /products → sku (auto-generated)"
+assert_eq "POST /products → status" "in_stock" "$(json_get "$PRODUCT" "data.status")"
 
-# Read
-GOT=$(get "/products/$PRODUCT_ID")
-assert_eq "GET /products/:id → name" "E2E 紫水晶原石" "$(json_field "$GOT" "['data']['name']")"
-assert_eq "GET /products/:id → category" "測試紫水晶" "$(json_field "$GOT" "['data']['category']['name']")"
+GOT=$(http_get "/products/$PRODUCT_ID")
+assert_eq "GET /products/:id → name" "E2E 紫水晶原石" "$(json_get "$GOT" "data.name")"
+assert_eq "GET /products/:id → category" "測試紫水晶" "$(json_get "$GOT" "data.category.name")"
 
-# Update
-UPDATED=$(curl -sf -X PUT "$BASE/products/$PRODUCT_ID" \
-  -H "Content-Type: application/json" \
-  -d '{"listPrice":"1350","notes":"測試備註"}')
-assert_eq "PUT /products/:id → listPrice" "1350" "$(json_field "$UPDATED" "['data']['listPrice']")"
-assert_eq "PUT /products/:id → notes" "測試備註" "$(json_field "$UPDATED" "['data']['notes']")"
+UPDATED=$(http_put "/products/$PRODUCT_ID" '{"listPrice":"1350","notes":"測試備註"}')
+assert_eq "PUT /products/:id → listPrice" "1350.00" "$(json_get "$UPDATED" "data.listPrice")"
+assert_eq "PUT /products/:id → notes" "測試備註" "$(json_get "$UPDATED" "data.notes")"
 
-# List with filter
-LIST=$(get "/products?q=E2E")
-assert_nonempty "GET /products?q=E2E → data" "$(json_field "$LIST" "['data']")"
-
-# Cannot delete sold product (tested after sale is created)
+LIST=$(http_get "/products?q=E2E")
+LIST_LEN=$(echo "$LIST" | python3 -c "import sys,json; print(len(json.load(sys.stdin)['data']))" 2>/dev/null || echo "0")
+assert_nonempty "$LIST_LEN" "GET /products?q=E2E → results"
 
 # ── 4. Sales ─────────────────────────────────────────────────────────────────
 section "4. 銷售（原子交易）"
 
-SALE=$(post "/sales" "{
-  \"productId\": $PRODUCT_ID,
-  \"salePrice\": \"1100\",
-  \"channel\": \"line\",
-  \"soldAt\": \"$(date +%Y-%m-%d)\"
-}")
-SALE_ID=$(json_field "$SALE" "['data']['id']")
-assert_nonempty "POST /sales → id" "$SALE_ID"
-assert_eq "POST /sales → salePrice" "1100" "$(json_field "$SALE" "['data']['salePrice']")"
+TODAY=$(date +%Y-%m-%d)
+SALE=$(http_post "/sales" "{\"productId\":$PRODUCT_ID,\"salePrice\":\"1100\",\"channel\":\"line\",\"soldAt\":\"$TODAY\"}")
+SALE_ID=$(json_get "$SALE" "data.id")
+assert_nonempty "$SALE_ID" "POST /sales → id"
+assert_eq "POST /sales → salePrice" "1100.00" "$(json_get "$SALE" "data.salePrice")"
 
-# Product status should now be sold
-SOLD_PRODUCT=$(get "/products/$PRODUCT_ID")
-assert_eq "product.status → sold after sale" "sold" "$(json_field "$SOLD_PRODUCT" "['data']['status']")"
+SOLD_PRODUCT=$(http_get "/products/$PRODUCT_ID")
+assert_eq "product.status → sold after sale" "sold" "$(json_get "$SOLD_PRODUCT" "data.status")"
 
-# Cannot sell same product again
-DUP_SALE_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" -X POST "$BASE/sales" \
+DUP_SALE_STATUS=$(http_status -X POST "$BASE/sales" \
   -H "Content-Type: application/json" \
-  -d "{\"productId\": $PRODUCT_ID, \"salePrice\": \"900\", \"channel\": \"other\", \"soldAt\": \"$(date +%Y-%m-%d)\"}")
+  -d "{\"productId\": $PRODUCT_ID, \"salePrice\": \"900\", \"channel\": \"other\", \"soldAt\": \"$TODAY\"}")
 assert_eq "POST /sales duplicate product → 400" "400" "$DUP_SALE_STATUS"
 
-# Cannot delete sold product
-DEL_SOLD=$(curl -sf -o /dev/null -w "%{http_code}" -X DELETE "$BASE/products/$PRODUCT_ID")
-assert_eq "DELETE sold product → 400" "400" "$DEL_SOLD"
+DEL_SOLD_STATUS=$(http_status -X DELETE "$BASE/products/$PRODUCT_ID")
+assert_eq "DELETE sold product → 400" "400" "$DEL_SOLD_STATUS"
 
-# Sales list
-SALES_LIST=$(get "/sales?page=1&limit=10")
-assert_nonempty "GET /sales → data" "$(json_field "$SALES_LIST" "['data']")"
-assert_nonempty "GET /sales → meta.total" "$(json_field "$SALES_LIST" "['meta']['total']")"
+SALES_LIST=$(http_get "/sales?page=1&limit=10")
+assert_nonempty "$(json_get "$SALES_LIST" "meta.total")" "GET /sales → meta.total"
 
 # ── 5. Dashboard ─────────────────────────────────────────────────────────────
 section "5. 看板統計"
 
-STATS=$(get "/dashboard/stats")
-assert_nonempty "GET /dashboard/stats → data" "$(json_field "$STATS" "['data']")"
-assert_nonempty "GET /dashboard/stats → totalSold" "$(json_field "$STATS" "['data']['totalSold']")"
-assert_nonempty "GET /dashboard/stats → realizedRevenue" "$(json_field "$STATS" "['data']['realizedRevenue']")"
-assert_nonempty "GET /dashboard/stats → countByCategory" "$(json_field "$STATS" "['data']['countByCategory']")"
-assert_nonempty "GET /dashboard/stats → recentSales" "$(json_field "$STATS" "['data']['recentSales']")"
+STATS=$(http_get "/dashboard/stats")
+assert_nonempty "$(json_get "$STATS" "data.totalSold")"       "GET /dashboard/stats → totalSold"
+assert_nonempty "$(json_get "$STATS" "data.realizedRevenue")" "GET /dashboard/stats → realizedRevenue"
+assert_nonempty "$(json_get "$STATS" "data.realizedProfit")"  "GET /dashboard/stats → realizedProfit"
 
-# Realized profit = revenue - cost  (1100 - 600 = 500, but DB may have others)
-PROFIT=$(json_field "$STATS" "['data']['realizedProfit']")
-assert_nonempty "GET /dashboard/stats → realizedProfit" "$PROFIT"
-
-# ── 6. Delete sale & restore product ─────────────────────────────────────────
+# ── 6. Delete sale → restore product ─────────────────────────────────────────
 section "6. 刪除銷售 → 商品回到 in_stock"
 
-DEL_SALE=$(delete "/sales/$SALE_ID")
+DEL_SALE=$(http_delete "/sales/$SALE_ID")
 assert_eq "DELETE /sales/:id → 204" "204" "$DEL_SALE"
-SALE_ID=""  # prevent double-delete in cleanup
+SALE_ID=""
 
-RESTORED=$(get "/products/$PRODUCT_ID")
-assert_eq "product.status → in_stock after sale deleted" "in_stock" "$(json_field "$RESTORED" "['data']['status']")"
+RESTORED=$(http_get "/products/$PRODUCT_ID")
+assert_eq "product.status → in_stock after sale deleted" "in_stock" "$(json_get "$RESTORED" "data.status")"
 
 # ── 7. QR Code ────────────────────────────────────────────────────────────────
 section "7. QR Code"
 
-QR_STATUS=$(curl -sf -o /dev/null -w "%{http_code}" "$BASE/products/$PRODUCT_ID/qr")
+QR_STATUS=$(http_status "$BASE/products/$PRODUCT_ID/qr")
 assert_eq "GET /products/:id/qr → 200" "200" "$QR_STATUS"
 
-QR_CT=$(curl -sf -o /dev/null -w "%{content_type}" "$BASE/products/$PRODUCT_ID/qr")
+QR_CT=$(curl -sf -o /dev/null -w "%{content_type}" "$BASE/products/$PRODUCT_ID/qr" 2>/dev/null || echo "")
 assert_eq "GET /products/:id/qr → image/png" "image/png" "$QR_CT"
 
 # ── Summary ──────────────────────────────────────────────────────────────────

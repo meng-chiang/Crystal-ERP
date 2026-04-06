@@ -33,8 +33,7 @@ export async function createTestProduct(categoryId: number): Promise<number> {
     categoryId,
     costPrice: '500',
     listPrice: '900',
-    weightG: 120,
-    qualityDescription: '冰裂少，光澤佳',
+    weightG: '120',   // must be string — schema uses z.string().regex(...)
   });
   return res.data.id;
 }
