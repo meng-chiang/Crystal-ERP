@@ -24,6 +24,7 @@ services:
       DATABASE_URL: mysql://${DB_USER}:${DB_PASSWORD}@db:3306/crystal_erp
       UPLOAD_DIR: /app/storage/photos
       PORT: 3001
+      FRONTEND_URL: ${FRONTEND_URL:-}
     volumes:
       - ./storage/photos:/app/storage/photos
     ports:
@@ -38,7 +39,7 @@ services:
       dockerfile: frontend/Dockerfile
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3001
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     ports:
       - "3000:3000"
     depends_on:

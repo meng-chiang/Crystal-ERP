@@ -17,10 +17,15 @@ const app = new Hono();
 
 // Middleware
 app.use('*', logger());
+const allowedOrigins = [
+  'http://localhost:3000',
+  ...(process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',').map((s) => s.trim()) : []),
+];
+
 app.use(
   '*',
   cors({
-    origin: ['http://localhost:3000', process.env.FRONTEND_URL || 'http://localhost:3000'],
+    origin: allowedOrigins,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type'],
   })
