@@ -8,10 +8,9 @@ COPY backend/package.json ./backend/
 
 RUN npm install --workspace=packages/shared --workspace=backend
 
-WORKDIR /app/backend
-
 ENV NODE_ENV=development
 
 EXPOSE 3001
 
-CMD ["npm", "run", "dev"]
+# Build shared first (after volume mount), then start backend dev server
+CMD ["sh", "-c", "npm run build --workspace=packages/shared && npm run dev --workspace=backend"]
