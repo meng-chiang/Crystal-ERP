@@ -42,7 +42,7 @@ export interface Product {
 export interface Sale {
   id: number;
   productId: number;
-  product?: Pick<Product, 'id' | 'sku' | 'name' | 'costPrice'>;
+  product?: Pick<Product, 'id' | 'sku' | 'name' | 'costPrice'> & { categoryName: string | null };
   salePrice: string;
   channel: SalesChannel;
   soldAt: string;

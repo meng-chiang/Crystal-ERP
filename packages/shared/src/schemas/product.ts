@@ -50,7 +50,9 @@ export const ProductQuerySchema = z.object({
 });
 
 export const SaleQuerySchema = z.object({
+  q: z.string().optional(),
   channel: SalesChannelSchema.optional(),
+  categoryId: z.coerce.number().int().positive().optional(),
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   page: z.coerce.number().int().min(1).optional().default(1),

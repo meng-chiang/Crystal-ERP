@@ -3,21 +3,59 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { salesApi } from '@/lib/api';
+import { salesApi, categoriesApi } from '@/lib/api';
 import { formatCurrency, formatDate, calculateProfit, CHANNEL_LABELS, cn } from '@/lib/utils';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import Pagination from '@/components/ui/Pagination';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
+const CHANNELS = [
+  { value: 'line', label: 'LINE' },
+  { value: 'shopee', label: '蝦皮' },
+  { value: 'livestream', label: '直播' },
+  { value: 'in_person', label: '現場' },
+  { value: 'other', label: '其他' },
+];
+
+interface Filters {
+  q: string;
+  channel: string;
+  categoryId: string;
+  from: string;
+  to: string;
+}
+
+const DEFAULT_FILTERS: Filters = { q: '', channel: '', categoryId: '', from: '', to: '' };
+
+function hasActiveFilters(f: Filters) {
+  return f.q !== '' || f.channel !== '' || f.categoryId !== '' || f.from !== '' || f.to !== '';
+}
+
 export default function SalesPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
+  const { data: categoriesData } = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => categoriesApi.list(),
+  });
+
+  const queryParams = {
+    page,
+    limit: 20,
+    ...(filters.q && { q: filters.q }),
+    ...(filters.channel && { channel: filters.channel }),
+    ...(filters.categoryId && { categoryId: Number(filters.categoryId) }),
+    ...(filters.from && { from: filters.from }),
+    ...(filters.to && { to: filters.to }),
+  };
+
   const { data, isLoading } = useQuery({
-    queryKey: ['sales', { page }],
-    queryFn: () => salesApi.list({ page, limit: 20 }),
+    queryKey: ['sales', queryParams],
+    queryFn: () => salesApi.list(queryParams),
   });
 
   const deleteMutation = useMutation({
@@ -32,8 +70,19 @@ export default function SalesPage() {
     onError: () => toast.error('刪除失敗，請重試'),
   });
 
+  function setFilter<K extends keyof Filters>(key: K, value: Filters[K]) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+    setPage(1);
+  }
+
+  function clearFilters() {
+    setFilters(DEFAULT_FILTERS);
+    setPage(1);
+  }
+
   return (
     <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">銷售紀錄</h1>
@@ -50,11 +99,90 @@ export default function SalesPage() {
         </Link>
       </div>
 
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="flex flex-wrap gap-3 items-end">
+          {/* 關鍵字搜尋 */}
+          <div className="flex-1 min-w-40">
+            <label className="block text-xs text-gray-500 mb-1">商品名稱 / SKU</label>
+            <input
+              type="text"
+              placeholder="搜尋..."
+              value={filters.q}
+              onChange={(e) => setFilter('q', e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+
+          {/* 分類 */}
+          <div className="min-w-36">
+            <label className="block text-xs text-gray-500 mb-1">分類</label>
+            <select
+              value={filters.categoryId}
+              onChange={(e) => setFilter('categoryId', e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+            >
+              <option value="">全部分類</option>
+              {categoriesData?.data.map((cat) => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 通路 */}
+          <div className="min-w-32">
+            <label className="block text-xs text-gray-500 mb-1">通路</label>
+            <select
+              value={filters.channel}
+              onChange={(e) => setFilter('channel', e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+            >
+              <option value="">全部通路</option>
+              {CHANNELS.map((ch) => (
+                <option key={ch.value} value={ch.value}>{ch.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 日期範圍 */}
+          <div className="min-w-36">
+            <label className="block text-xs text-gray-500 mb-1">開始日期</label>
+            <input
+              type="date"
+              value={filters.from}
+              onChange={(e) => setFilter('from', e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+          <div className="min-w-36">
+            <label className="block text-xs text-gray-500 mb-1">結束日期</label>
+            <input
+              type="date"
+              value={filters.to}
+              onChange={(e) => setFilter('to', e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
+
+          {/* 清除篩選 */}
+          {hasActiveFilters(filters) && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              清除
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Table */}
       {isLoading ? (
         <div className="bg-white rounded-xl border border-gray-200 animate-pulse h-64" />
       ) : data?.data.length === 0 ? (
         <div className="text-center py-16 text-gray-400">
-          <p>尚無銷售紀錄</p>
+          <p>{hasActiveFilters(filters) ? '找不到符合條件的銷售紀錄' : '尚無銷售紀錄'}</p>
         </div>
       ) : (
         <>
@@ -64,6 +192,7 @@ export default function SalesPage() {
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">日期</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">商品</th>
+                  <th className="text-left px-4 py-3 text-gray-500 font-medium">分類</th>
                   <th className="text-left px-4 py-3 text-gray-500 font-medium">通路</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">成交價</th>
                   <th className="text-right px-4 py-3 text-gray-500 font-medium">毛利</th>
@@ -75,18 +204,19 @@ export default function SalesPage() {
                   const profit = calculateProfit(sale.salePrice, sale.product?.costPrice);
                   return (
                     <tr key={sale.id} className="border-b border-gray-50 hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-600">{formatDate(String(sale.soldAt))}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(String(sale.soldAt))}</td>
                       <td className="px-4 py-3">
-                        <div>
-                          <p className="font-medium text-gray-900">{sale.product?.name}</p>
-                          <p className="text-gray-400 text-xs font-mono">{sale.product?.sku}</p>
-                        </div>
+                        <p className="font-medium text-gray-900">{sale.product?.name}</p>
+                        <p className="text-gray-400 text-xs font-mono">{sale.product?.sku}</p>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-sm">
+                        {sale.product?.categoryName ?? '—'}
                       </td>
                       <td className="px-4 py-3 text-gray-600">{CHANNEL_LABELS[sale.channel]}</td>
-                      <td className="px-4 py-3 text-right font-medium text-gray-900">
+                      <td className="px-4 py-3 text-right font-medium text-gray-900 whitespace-nowrap">
                         {formatCurrency(String(sale.salePrice))}
                       </td>
-                      <td className={cn('px-4 py-3 text-right font-medium', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
+                      <td className={cn('px-4 py-3 text-right font-medium whitespace-nowrap', profit >= 0 ? 'text-green-600' : 'text-red-500')}>
                         {formatCurrency(profit)}
                       </td>
                       <td className="px-4 py-3">

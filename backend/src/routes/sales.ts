@@ -1,45 +1,55 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { db } from '../db/connection.js';
-import { sales, products } from '../db/schema.js';
+import { sales, products, categories } from '../db/schema.js';
 import { CreateSaleSchema, SaleQuerySchema } from '@crystal-erp/shared';
-import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, sql, desc, like, or } from 'drizzle-orm';
 
 const app = new Hono();
 
 // 銷售紀錄列表
 app.get('/', zValidator('query', SaleQuerySchema), async (c) => {
   const query = c.req.valid('query');
-  const { channel, from, to, page, limit } = query;
+  const { q, channel, categoryId, from, to, page, limit } = query;
 
   const conditions = [];
   if (channel) conditions.push(eq(sales.channel, channel));
+  if (categoryId) conditions.push(eq(products.categoryId, categoryId));
   if (from) conditions.push(gte(sales.soldAt, new Date(from)));
   if (to) conditions.push(lte(sales.soldAt, new Date(to)));
+  if (q) conditions.push(or(like(products.name, `%${q}%`), like(products.sku, `%${q}%`))!);
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [countResult] = await db
     .select({ count: sql<number>`COUNT(*)` })
     .from(sales)
+    .leftJoin(products, eq(sales.productId, products.id))
     .where(whereClause);
 
   const total = Number(countResult.count);
   const offset = (page - 1) * limit;
 
   const rows = await db
-    .select({ sale: sales, product: products })
+    .select({ sale: sales, product: products, category: categories })
     .from(sales)
     .leftJoin(products, eq(sales.productId, products.id))
+    .leftJoin(categories, eq(products.categoryId, categories.id))
     .where(whereClause)
     .orderBy(desc(sales.soldAt), desc(sales.createdAt))
     .limit(limit)
     .offset(offset);
 
-  const data = rows.map(({ sale, product }) => ({
+  const data = rows.map(({ sale, product, category }) => ({
     ...sale,
     product: product
-      ? { id: product.id, sku: product.sku, name: product.name, costPrice: product.costPrice }
+      ? {
+          id: product.id,
+          sku: product.sku,
+          name: product.name,
+          costPrice: product.costPrice,
+          categoryName: category?.name ?? null,
+        }
       : null,
   }));
 
@@ -55,20 +65,21 @@ app.get('/:id', async (c) => {
   if (isNaN(id)) return c.json({ error: '無效的 ID' }, 400);
 
   const rows = await db
-    .select({ sale: sales, product: products })
+    .select({ sale: sales, product: products, category: categories })
     .from(sales)
     .leftJoin(products, eq(sales.productId, products.id))
+    .leftJoin(categories, eq(products.categoryId, categories.id))
     .where(eq(sales.id, id))
     .limit(1);
 
   if (rows.length === 0) return c.json({ error: '銷售紀錄不存在' }, 404);
 
-  const { sale, product } = rows[0];
+  const { sale, product, category } = rows[0];
   return c.json({
     data: {
       ...sale,
       product: product
-        ? { id: product.id, sku: product.sku, name: product.name, costPrice: product.costPrice }
+        ? { id: product.id, sku: product.sku, name: product.name, costPrice: product.costPrice, categoryName: category?.name ?? null }
         : null,
     },
   });
@@ -103,19 +114,20 @@ app.post('/', zValidator('json', CreateSaleSchema), async (c) => {
   });
 
   const rows = await db
-    .select({ sale: sales, product: products })
+    .select({ sale: sales, product: products, category: categories })
     .from(sales)
     .leftJoin(products, eq(sales.productId, products.id))
+    .leftJoin(categories, eq(products.categoryId, categories.id))
     .where(eq(sales.id, saleId!))
     .limit(1);
 
-  const { sale, product: p } = rows[0];
+  const { sale, product: p, category: cat } = rows[0];
   return c.json(
     {
       data: {
         ...sale,
         product: p
-          ? { id: p.id, sku: p.sku, name: p.name, costPrice: p.costPrice }
+          ? { id: p.id, sku: p.sku, name: p.name, costPrice: p.costPrice, categoryName: cat?.name ?? null }
           : null,
       },
     },
