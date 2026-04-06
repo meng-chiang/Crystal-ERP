@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { db } from '../db/connection.js';
 import { sales, products, categories } from '../db/schema.js';
 import { CreateSaleSchema, SaleQuerySchema } from '@crystal-erp/shared';
-import { eq, and, gte, lte, sql, desc, like, or } from 'drizzle-orm';
+import { eq, and, gte, lte, sql, desc, like, or, type SQL } from 'drizzle-orm';
 
 const app = new Hono();
 
@@ -17,7 +17,7 @@ app.get('/', zValidator('query', SaleQuerySchema), async (c) => {
   if (categoryId) conditions.push(eq(products.categoryId, categoryId));
   if (from) conditions.push(gte(sales.soldAt, new Date(from)));
   if (to) conditions.push(lte(sales.soldAt, new Date(to)));
-  if (q) conditions.push(or(like(products.name, `%${q}%`), like(products.sku, `%${q}%`))!);
+  if (q) conditions.push(or(like(products.name, `%${q}%`), like(products.sku, `%${q}%`)) as SQL);
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

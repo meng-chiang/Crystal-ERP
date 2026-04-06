@@ -5,22 +5,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { salesApi, categoriesApi } from '@/lib/api';
 import { formatCurrency, formatDate, calculateProfit, CHANNEL_LABELS, cn } from '@/lib/utils';
+import type { SalesChannel } from '@crystal-erp/shared';
 import { Plus, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import Pagination from '@/components/ui/Pagination';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 
-const CHANNELS = [
-  { value: 'line', label: 'LINE' },
-  { value: 'shopee', label: '蝦皮' },
-  { value: 'livestream', label: '直播' },
-  { value: 'in_person', label: '現場' },
-  { value: 'other', label: '其他' },
-];
-
 interface Filters {
   q: string;
-  channel: string;
+  channel: SalesChannel | '';
   categoryId: string;
   from: string;
   to: string;
@@ -41,6 +34,7 @@ export default function SalesPage() {
   const { data: categoriesData } = useQuery({
     queryKey: ['categories'],
     queryFn: () => categoriesApi.list(),
+    staleTime: 60 * 60 * 1000,
   });
 
   const queryParams = {
@@ -82,7 +76,6 @@ export default function SalesPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">銷售紀錄</h1>
@@ -99,10 +92,8 @@ export default function SalesPage() {
         </Link>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex flex-wrap gap-3 items-end">
-          {/* 關鍵字搜尋 */}
           <div className="flex-1 min-w-40">
             <label className="block text-xs text-gray-500 mb-1">商品名稱 / SKU</label>
             <input
@@ -114,7 +105,6 @@ export default function SalesPage() {
             />
           </div>
 
-          {/* 分類 */}
           <div className="min-w-36">
             <label className="block text-xs text-gray-500 mb-1">分類</label>
             <select
@@ -129,22 +119,20 @@ export default function SalesPage() {
             </select>
           </div>
 
-          {/* 通路 */}
           <div className="min-w-32">
             <label className="block text-xs text-gray-500 mb-1">通路</label>
             <select
               value={filters.channel}
-              onChange={(e) => setFilter('channel', e.target.value)}
+              onChange={(e) => setFilter('channel', e.target.value as SalesChannel | '')}
               className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
             >
               <option value="">全部通路</option>
-              {CHANNELS.map((ch) => (
-                <option key={ch.value} value={ch.value}>{ch.label}</option>
+              {Object.entries(CHANNEL_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
               ))}
             </select>
           </div>
 
-          {/* 日期範圍 */}
           <div className="min-w-36">
             <label className="block text-xs text-gray-500 mb-1">開始日期</label>
             <input
@@ -164,7 +152,6 @@ export default function SalesPage() {
             />
           </div>
 
-          {/* 清除篩選 */}
           {hasActiveFilters(filters) && (
             <button
               onClick={clearFilters}
@@ -177,7 +164,6 @@ export default function SalesPage() {
         </div>
       </div>
 
-      {/* Table */}
       {isLoading ? (
         <div className="bg-white rounded-xl border border-gray-200 animate-pulse h-64" />
       ) : data?.data.length === 0 ? (
